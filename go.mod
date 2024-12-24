@@ -1,4 +1,4 @@
-module github.com/genericness/bare-server-go
+module github.com/tomphttp/bare-server-go
 
 go 1.23.4
 
