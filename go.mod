@@ -1,4 +1,4 @@
-module github.com/bare-server-go
+module github.com/golang/bare-server-go
 
 go 1.20
 
