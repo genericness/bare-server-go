@@ -248,7 +248,7 @@ func (s *BareServer) getInstanceInfo() BareManifest {
 		Project: &BareProject{
 			Name:        "bare-server-go",
 			Description: "Bare server implementation in Go",
-			Repository:  "https://github.com/genericness/bare-server-go",
+			Repository:  "https://github.com/tomphttp/bare-server-go",
 			Version:     "0.1.0",
 		},
 	}
