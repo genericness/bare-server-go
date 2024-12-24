@@ -1,9 +1,10 @@
 # bare-server-go
+
 heart emoji
 
-go build
+go build ./server
 
-./bare-server-go --help
+./server --help
 
 # Credits
 
