@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MPL-2.0
+// tomphttp/bare-server-go
 package main
 
 import (
@@ -230,7 +232,7 @@ func (s *BareServer) RouteUpgrade(w http.ResponseWriter, r *http.Request, conn *
 		Native:  r,
 	}
 
-	service := strings.TrimPrefix(r.URL.Path, s.directory)
+	service := r.URL.Path[len(s.directory)-1:]
 
 	if handler, ok := s.socketRoutes[service]; ok {
 		if err := handler(request, conn, s.options); err != nil {
@@ -252,7 +254,7 @@ func (s *BareServer) RouteRequest(w http.ResponseWriter, r *http.Request) {
 		Native:  r,
 	}
 
-	service := strings.TrimPrefix(r.URL.Path, s.directory)
+	service := r.URL.Path[len(s.directory)-1:]
 	var response *Response
 	var err error
 
