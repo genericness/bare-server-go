@@ -82,22 +82,6 @@ type BareProject struct {
 
 type BareLanguage string
 
-const (
-	LanguageNodeJS        BareLanguage = "NodeJS"
-	LanguageServiceWorker BareLanguage = "ServiceWorker"
-	LanguageDeno          BareLanguage = "Deno"
-	LanguageJava          BareLanguage = "Java"
-	LanguagePHP           BareLanguage = "PHP"
-	LanguageRust          BareLanguage = "Rust"
-	LanguageC             BareLanguage = "C"
-	LanguageCPlusPlus     BareLanguage = "C++"
-	LanguageCSharp        BareLanguage = "C#"
-	LanguageRuby          BareLanguage = "Ruby"
-	LanguageGo            BareLanguage = "Go"
-	LanguageCrystal       BareLanguage = "Crystal"
-	LanguageShell         BareLanguage = "Shell"
-)
-
 type BareManifest struct {
 	Versions    []string        `json:"versions"`
 	Language    BareLanguage    `json:"language"`
@@ -258,7 +242,7 @@ func (s *BareServer) getInstanceInfo() BareManifest {
 
 	info := BareManifest{
 		Versions:    s.versions,
-		Language:    LanguageGo,
+		Language:    "Go",
 		MemoryUsage: float64(memStats.HeapAlloc) / 1024 / 1024,
 		Maintainer:  s.options.Maintainer,
 		Project: &BareProject{
