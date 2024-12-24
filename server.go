@@ -28,15 +28,12 @@ const (
 )
 
 type BareError struct {
-	Status  int    `json:"status"`
+	Status int `json:"-"`
+	// Status  int    `json:"status"`
 	Code    string `json:"code"`
 	ID      string `json:"id"`
 	Message string `json:"message,omitempty"`
 	Stack   string `json:"stack,omitempty"`
-}
-
-func (e *BareError) Error() string {
-	return fmt.Sprintf("%s: %s", e.Code, e.Message)
 }
 
 type BareServer struct {
@@ -51,7 +48,7 @@ type BareServer struct {
 
 type Options struct {
 	LogErrors    bool
-	FilterRemote func(*url.URL) error
+	FilterRemote func(*url.URL) *BareError
 	Lookup       func(hostname string, service string, hints ...net.IPAddr) (addrs []net.IPAddr, err error)
 	LocalAddress string
 	Family       int
@@ -60,7 +57,7 @@ type Options struct {
 	httpsAgent   *http.Transport
 }
 
-type RouteCallback func(request *BareRequest, response http.ResponseWriter, options *Options) error
+type RouteCallback func(request *BareRequest, response http.ResponseWriter, options *Options) *BareError
 
 type SocketRouteCallback func(request *BareRequest, conn *websocket.Conn, options *Options) error
 
@@ -111,9 +108,9 @@ type BareManifest struct {
 
 func NewBareServer(directory string, options *Options) *BareServer {
 	if options.FilterRemote == nil {
-		options.FilterRemote = func(remote *url.URL) error {
+		options.FilterRemote = func(remote *url.URL) *BareError {
 			if isValidIP(remote.Hostname()) && !parseIP(remote.Hostname()).IsGlobalUnicast() {
-				return errors.New("forbidden IP")
+				return &BareError{403, "Forbidden", "UNKNOWN", "forbidden IP", ""}
 			}
 			return nil
 		}
@@ -226,7 +223,8 @@ func (s *BareServer) RouteRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	service := r.URL.Path[len(s.directory)-1:]
-	var err error
+
+	var err *BareError
 
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusOK)
@@ -234,28 +232,23 @@ func (s *BareServer) RouteRequest(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		enc := json.NewEncoder(w)
-		enc.SetIndent("", "  ")
+		enc.SetIndent("", "\t")
 		enc.Encode(s.getInstanceInfo())
 	} else if handler, ok := s.routes[service]; ok {
 		err = handler(request, w, s.options)
+		if s.options.LogErrors && err != nil {
+			fmt.Fprintf(os.Stderr, "%s\n", err.Message)
+		}
 	} else {
-		err = createHttpError(http.StatusNotFound, "Not Found")
+		err = &BareError{404, "UNKNOWN", "error.NotFoundError", "Not Found", ""}
 	}
 
 	if err != nil {
-		if s.options.LogErrors {
-			fmt.Fprintf(os.Stderr, "Error handling request: %s\n", err)
-		}
-
-		if httpErr, ok := err.(error); ok {
-			if strings.HasPrefix(httpErr.Error(), "404") {
-				http.Error(w, httpErr.Error(), http.StatusNotFound)
-			} else {
-				http.Error(w, httpErr.Error(), http.StatusInternalServerError)
-			}
-		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(err.Status)
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "\t")
+		enc.Encode(*err)
 	}
 }
 
@@ -382,7 +375,7 @@ func joinHeaders(headers http.Header) http.Header {
 	return output
 }
 
-func outgoingError(err error) error {
+func outgoingError(err error) *BareError {
 	if netErr, ok := err.(net.Error); ok {
 		if netErr.Timeout() {
 			return &BareError{500, "CONNECTION_TIMEOUT", "response", "The response timed out.", ""}
@@ -398,10 +391,12 @@ func outgoingError(err error) error {
 			}
 		}
 	}
-	return err
+
+	return &BareError{500, "UNKNOWN", "unknown", "", ""}
+	//return errerr
 }
 
-func bareFetch(request *BareRequest, requestHeaders http.Header, remote *url.URL, options *Options) (*http.Response, error) {
+func bareFetch(request *BareRequest, requestHeaders http.Header, remote *url.URL, options *Options) (*http.Response, *BareError) {
 	if options.FilterRemote != nil {
 		if err := options.FilterRemote(remote); err != nil {
 			return nil, err
@@ -410,7 +405,7 @@ func bareFetch(request *BareRequest, requestHeaders http.Header, remote *url.URL
 
 	req, err := http.NewRequest(request.Method, remote.String(), request.Body)
 	if err != nil {
-		return nil, err
+		return nil, outgoingError(err)
 	}
 
 	req.Header = requestHeaders
@@ -438,7 +433,7 @@ func bareFetch(request *BareRequest, requestHeaders http.Header, remote *url.URL
 	return resp, nil
 }
 
-func webSocketFetch(requestHeaders http.Header, remote *url.URL, protocols []string, options *Options) (*http.Response, *websocket.Conn, *http.Request, error) {
+func webSocketFetch(requestHeaders http.Header, remote *url.URL, protocols []string, options *Options) (*http.Response, *websocket.Conn, *http.Request, *BareError) {
 	if options.FilterRemote != nil {
 		if err := options.FilterRemote(remote); err != nil {
 			return nil, nil, nil, err
@@ -509,7 +504,7 @@ func registerV3(server *BareServer) {
 
 	splitHeaderValue := regexp.MustCompile(`,\s*`)
 
-	readHeaders := func(request *BareRequest) (map[string]interface{}, error) {
+	readHeaders := func(request *BareRequest) (map[string]interface{}, *BareError) {
 		sendHeaders := make(http.Header)
 		passHeaders := append([]string{}, defaultPassHeaders...)
 		var passStatus []int
@@ -606,7 +601,7 @@ func registerV3(server *BareServer) {
 		return result, nil
 	}
 
-	server.Handle("/v3/", func(request *BareRequest, w http.ResponseWriter, options *Options) error {
+	server.Handle("/v3/", func(request *BareRequest, w http.ResponseWriter, options *Options) *BareError {
 		headersData, err := readHeaders(request)
 		if err != nil {
 			return err
@@ -653,10 +648,9 @@ func registerV3(server *BareServer) {
 
 			headersJSON, err := json.Marshal(m)
 			if err != nil {
-				return err
+				fmt.Fprintf(os.Stderr, "%s\n", err)
+				return &BareError{500, "UNKNOWN", "unknown", err.Error(), ""}
 			}
-			// println(string(headersJSON))
-			// os.Exit(1)
 			responseHeaders.Set("x-bare-headers", string(headersJSON))
 		}
 
@@ -673,6 +667,7 @@ func registerV3(server *BareServer) {
 	})
 
 	server.HandleSocket("/v3/", func(request *BareRequest, clientConn *websocket.Conn, options *Options) error {
+
 		defer clientConn.Close()
 
 		messageType, message, err := clientConn.ReadMessage()
@@ -707,8 +702,8 @@ func registerV3(server *BareServer) {
 		connectHeaders.Del("upgrade")
 		connectHeaders.Del("connection")
 
-		resp, remoteSocket, _, err := webSocketFetch(connectHeaders, parsedURL, connectPacket.Protocols, options)
-		if err != nil {
+		resp, remoteSocket, _, berr := webSocketFetch(connectHeaders, parsedURL, connectPacket.Protocols, options)
+		if berr != nil {
 			return fmt.Errorf("error establishing remote WebSocket connection: %w", err)
 		}
 
@@ -812,10 +807,6 @@ func containsInt(s []int, e int) bool {
 		}
 	}
 	return false
-}
-
-func createHttpError(statusCode int, message string) error {
-	return fmt.Errorf("%d %s", statusCode, message)
 }
 
 func main() {
