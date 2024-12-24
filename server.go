@@ -99,11 +99,11 @@ const (
 )
 
 type BareManifest struct {
-	Maintainer  *BareMaintainer `json:"maintainer,omitempty"`
-	Project     *BareProject    `json:"project,omitempty"`
 	Versions    []string        `json:"versions"`
 	Language    BareLanguage    `json:"language"`
 	MemoryUsage float64         `json:"memoryUsage,omitempty"`
+	Project     *BareProject    `json:"project,omitempty"`
+	Maintainer  *BareMaintainer `json:"maintainer,omitempty"`
 }
 
 func NewBareServer(directory string, options *Options) *BareServer {
