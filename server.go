@@ -8,7 +8,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/tomphttp/bare-server-go"
+	"github.com/tomphttp/bare-server-go/bare"
 )
 
 func main() {
