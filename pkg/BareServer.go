@@ -47,8 +47,8 @@ type Options struct {
 	LocalAddress string
 	Family       int
 	Maintainer   *BareMaintainer
-	httpAgent    *http.Transport
-	httpsAgent   *http.Transport
+	HttpAgent    *http.Transport
+	HttpsAgent   *http.Transport
 }
 
 type RouteCallback func(request *BareRequest, response http.ResponseWriter, options *Options) *BareError
@@ -107,8 +107,8 @@ func CreateBareServer(directory string, options *Options) *BareServer {
 		}
 	}
 
-	if options.httpAgent == nil {
-		options.httpAgent = &http.Transport{
+	if options.HttpAgent == nil {
+		options.HttpAgent = &http.Transport{
 			DialContext: (&net.Dialer{
 				LocalAddr: getLocalAddr(options.LocalAddress, options.Family),
 				Timeout:   30 * time.Second,
@@ -123,10 +123,10 @@ func CreateBareServer(directory string, options *Options) *BareServer {
 		}
 	}
 
-	options.httpAgent.DisableCompression = true
+	options.HttpAgent.DisableCompression = true
 
-	if options.httpsAgent == nil {
-		options.httpsAgent = &http.Transport{
+	if options.HttpsAgent == nil {
+		options.HttpsAgent = &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: true,
 			},
@@ -144,7 +144,7 @@ func CreateBareServer(directory string, options *Options) *BareServer {
 		}
 	}
 
-	options.httpsAgent.DisableCompression = true
+	options.HttpsAgent.DisableCompression = true
 
 	server := &BareServer{
 		directory:    directory,
@@ -392,14 +392,14 @@ func bareFetch(request *BareRequest, requestHeaders http.Header, remote *url.URL
 
 	var client *http.Client
 	if remote.Scheme == "https" {
-		if options.httpsAgent != nil {
-			client = &http.Client{Transport: options.httpsAgent}
+		if options.HttpsAgent != nil {
+			client = &http.Client{Transport: options.HttpsAgent}
 		} else {
 			client = &http.Client{}
 		}
 	} else {
-		if options.httpAgent != nil {
-			client = &http.Client{Transport: options.httpAgent}
+		if options.HttpAgent != nil {
+			client = &http.Client{Transport: options.HttpAgent}
 		} else {
 			client = &http.Client{}
 		}
